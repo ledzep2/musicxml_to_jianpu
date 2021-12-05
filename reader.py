@@ -24,7 +24,7 @@ class Attributes:
         self._cache = {
             'keysig': self._getKeySignature(prev_attributes),
             'timesig': self._getTimeSignature(prev_attributes),
-            'divisions': self._getDivisions(prev_attributes)
+            'divisions': self._getDivisions(prev_attributes),
         }
 
     def _getDivisions(self, prev_attributes):
@@ -94,6 +94,9 @@ class Note:
         else:
             return elem.text
 
+    def isChord(self):
+        return bool(self._elem.xpath('chord'))
+
     def isRest(self):
         return bool(self._elem.xpath('rest'))
 
@@ -104,6 +107,7 @@ class Note:
         return bool(self._elem.xpath("tie[@type='stop']"))
 
     def isTuplet(self):
+        # TODO: not accurate
         return bool(self._elem.xpath("time-modification"))
 
     def isTupletStart(self):
@@ -150,6 +154,19 @@ class Note:
 
         return (note_name, octave)
 
+    def getLyric(self):
+        lyric = self._elem.find('lyric')
+        if lyric is not None:
+            syllabic = lyric.find('syllabic').text
+            text = lyric.find('text').text
+            if syllabic in ('begin', 'middle'):
+                text += '-'
+            return text
+        return None
+
+    def getStaff(self):
+        return self._get_text('staff')
+
     def getAttributes(self):
         return self._attributes
 
@@ -160,10 +177,13 @@ class Measure:
     BARLINE_FINAL = "FINAL"
     BARLINE_REPEAT = "REPEAT"
 
-    def __init__(self, elem, prev_measure=None):
+    def __init__(self, elem, prev_measure=None, staff_filter=None):
         assert(elem.tag == 'measure')
         assert(not prev_measure or isinstance(prev_measure, Measure))
         self._elem = elem
+        self._prev_measure = prev_measure
+
+        self._staff_filter = staff_filter
 
         prev_attributes = prev_measure.getAttributes() if prev_measure else None
         attributes_elem = self._elem.find('attributes')
@@ -178,11 +198,19 @@ class Measure:
 
         assert(self._attributes is not None)
 
+    def cloneOnlyStaff(self, staff_filter):
+        m = Measure(self._elem, self._prev_measure, staff_filter)
+        return m
+
     def getMeasureNumber(self):
         return int(self._elem.get('number'))
 
     def getAttributes(self):
         return self._attributes
+
+    def getTempo(self):
+        tempo_elem = self._elem.find('direction/sound')
+        return tempo_elem.attrib['tempo']
 
     def _getBarLine(self, location):
         bar_style = self._elem.xpath('barline[@location="%s"]/bar-style' % location)
@@ -204,9 +232,22 @@ class Measure:
     def getRightBarlineType(self):
         return self._getBarLine('right')
 
+    def getStaffs(self):
+        s = {}
+        for elem in self._elem.xpath('note'):
+            n = Note(elem, self.getAttributes())
+            staff = n.getStaff()
+            if staff:
+                s[staff] = 1
+
+        return s
+
     def __iter__(self):
         for elem in self._elem.xpath('note'):
-            yield Note(elem, self.getAttributes())
+            n = Note(elem, self.getAttributes())
+            if self._staff_filter and not n.getStaff() in self._staff_filter:
+                continue
+            yield n
 
 def readCompressedMusicXML(filename):
     archive = zipfile.ZipFile(filename)
@@ -230,6 +271,12 @@ class MusicXMLReader:
         self._parts = [x.attrib.get('id')
                        for x in self._root.xpath('part-list/score-part')]
 
+        self._parts_details = [{
+            'name': x.find('part-name').text,
+            'abbrev': x.find('part-abbreviation').text,
+            'id': x.attrib.get('id'),
+        } for x in self._root.xpath('part-list/score-part')]
+
     def _get_text(self, xpath):
         nodes = self._root.xpath(xpath)
         if nodes:
@@ -241,7 +288,11 @@ class MusicXMLReader:
         return next(self.iterMeasures(self._parts[0]))
 
     def getWorkTitle(self):
-        return self._get_text('work/work-title')
+        ret = self._get_text('work/work-title')
+        if not ret:
+            ret = self._get_text('credit/credit-words')
+
+        return ret
 
     def getComposer(self):
         return self._get_text("identification/creator[@type='composer']")
@@ -252,8 +303,14 @@ class MusicXMLReader:
     def getInitialTimeSignature(self):
         return self._getFirstMeasure().getAttributes().getTimeSignature()
 
+    def getInitialTempo(self):
+        return self._getFirstMeasure().getTempo()
+
     def getPartIdList(self):
         return self._parts
+
+    def getPartDetailsList(self):
+        return self._parts_details
 
     def iterMeasures(self, partId):
         prev_measure = None
