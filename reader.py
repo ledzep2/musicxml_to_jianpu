@@ -84,8 +84,12 @@ class Note:
         self._elem = elem
         self._attributes = attributes
 
-    def _get_int(self, path):
-        return int(self._elem.find(path).text)
+    def _get_int(self, path, default=None):
+        p = self._elem.find(path)
+        if p is None:
+            return default
+
+        return int(p.text)
 
     def _get_text(self, path):
         elem = self._elem.find(path)
@@ -126,7 +130,7 @@ class Note:
 
     def getDuration(self):
         """ return a tuple (note divisions, divisions per quarternote) """
-        return (self._get_int('duration'), self._attributes.getDivisions())
+        return (self._get_int('duration', 4), self._attributes.getDivisions())
 
     def getPitch(self):
         """ return a tuple (note_name, octave) """

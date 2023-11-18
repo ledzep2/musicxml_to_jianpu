@@ -1,6 +1,7 @@
 from fractions import Fraction
 from writer import Jianpu99Writer
 import re
+import lxml.html
 
 
 """
@@ -20,11 +21,15 @@ class ByguitarWriter(Jianpu99Writer):
         'B': 'B'
     }
 
+    def __init__(self, tempo):
+        self.tempo_override = tempo
+
     def generateTimeSuffix(self, duration, divisions):
         note_length = Fraction(duration, divisions)
         return str(note_length)
 
     def generateBasicNote(self, note):
+        #print( lxml.html.tostring(note._elem) )
         (duration, divisions) = self.getNoteDisplayedDuration(note)
         time_suffix = self.generateTimeSuffix(duration, divisions)
         if note.isRest():
@@ -129,7 +134,13 @@ class ByguitarWriter(Jianpu99Writer):
     def generate(self, reader, part_index):
         return self.generateBody(reader, 2, part_index)
 
+
     def generate_jcx(self, reader):
+        def _getTempo():
+            if self.tempo_override:
+                return self.tempo_override
+            return reader.getInitialTempo()
+
         parts_score = {}
         timesig = reader.getInitialTimeSignature()
         beats, beats_type = timesig.split('/')
@@ -138,7 +149,7 @@ class ByguitarWriter(Jianpu99Writer):
             f'K: {reader.getInitialKeySignature()}',
             f'M: {beats}/{beats_type}',
             f'L: 1/{beats_type}',
-            f'Q: 1/{beats_type}={reader.getInitialTempo()}',
+            f'Q: 1/{beats_type}={_getTempo()}',
         ]
 
         parts = reader.getPartDetailsList()

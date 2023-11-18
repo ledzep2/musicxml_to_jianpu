@@ -11,6 +11,7 @@ def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_file', help="input file in MusicXML format")
     parser.add_argument('-m', '--mode', choices=('jianpu99', 'byguitar', 'jcx'), default='jcx', help="output format")
+    parser.add_argument('-t', '--tempo', default=0, help="tempo override")
     return parser.parse_args()
 
 
@@ -20,10 +21,10 @@ if __name__ == "__main__":
 
     reader = MusicXMLReader(args.input_file)
     if args.mode == 'jcx':
-        writer = ByguitarWriter()
+        writer = ByguitarWriter(args.tempo)
         print(writer.generate_jcx(reader))
     elif args.mode == 'byguitar':
-        writer = ByguitarWriter()
+        writer = ByguitarWriter(args.tempo)
         parts = reader.getPartIdList()
         for i in range(0, len(parts)):
             output_filename = f"{output_filebase}-{i}.txt"
