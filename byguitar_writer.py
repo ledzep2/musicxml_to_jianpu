@@ -9,6 +9,9 @@ byguitar add line no js
 $('.muse-line').each(function(i,a){let no=parseInt(a.children[0].id.replace('muse-bars-', ''));$(a).append('<span class="line-no" style="position:absolute;margin-left:-25px;font-size:14px;padding:2px;border:1px solid #777;">'+no+'</span>');});
 """
 
+def note2string(note):
+    return lxml.html.tostring(note._elem) 
+
 class ByguitarWriter(Jianpu99Writer):
 
     STEP_TO_NUMBER = {
@@ -67,6 +70,11 @@ class ByguitarWriter(Jianpu99Writer):
                 result = result[:idx] + ") " + result[idx:]
             else:
                 result = result + ")"
+        if note.isGrace():
+            #result = "{"+result+"}"
+            #print(note2string(note))
+            result = ''
+            pass
         return result
 
 

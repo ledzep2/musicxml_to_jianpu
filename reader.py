@@ -120,6 +120,9 @@ class Note:
     def isTupletStop(self):
         return self.isTuplet() and bool(self._elem.xpath("notations/tuplet[@type='stop']"))
 
+    def isGrace(self):
+        return bool(self._elem.xpath("grace"))
+
     def getDisplayedDuration(self):
         if not self.isTuplet():
             return self.getDuration()
